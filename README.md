@@ -1,4 +1,4 @@
-# Video and Music Downloader on YouTube
+# Video and Music Downloader from YouTube
 
 ## Build
 
