@@ -1,0 +1,6 @@
+/target
+
+cache/
+libs/
+*.mp4
+*.mp3
