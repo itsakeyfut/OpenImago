@@ -55,7 +55,7 @@ Steps for Contributors:
 
 ## License
 
-This project is licensed under the MIT License. See the ![LICENSE](./LICENSE-MIT) file for more details.
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE-MIT) file for more details.
 
 ## Author
 
