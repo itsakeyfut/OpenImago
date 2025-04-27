@@ -31,6 +31,7 @@ cargo build --release
 
 Supported formats: MP3 and MP4.
 
+At this time, PowerShell supported only.
 ```shell
 ./target/release/openimago -u <url> -f <format>
 ```
