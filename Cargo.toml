@@ -10,7 +10,7 @@ edition = "2024"
 rust-version = "1.86"
 
 [badges]
-maintenance = { status = "passively-maintained" }
+maintenance = { status = "actively-developed" }
 
 [dependencies]
 anyhow = "1.0.98"
