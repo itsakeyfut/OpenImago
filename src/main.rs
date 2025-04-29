@@ -1,11 +1,13 @@
+use std::path::PathBuf;
+use std::process::Command;
+
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::path::PathBuf;
-use std::process::Command;
 use tokio::time::Duration;
 use yt_dlp::Youtube;
 use yt_dlp::fetcher::deps::Libraries;
+
 use yt_downloader::cli::args::Args;
 
 #[tokio::main]
