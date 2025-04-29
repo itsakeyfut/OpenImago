@@ -2,7 +2,7 @@
 name = "open-imago"
 version = "0.1.0"
 authors = ["itsakeyfut <sicsempertyrannis98@gmail.com>"]
-description = "A simple YouTube downloader with a focus on speed and efficiency."
+description = "A simple video and audio downloader with a focus on speed and efficiency."
 repository = "https://github.com/itsakeyfut/open-imago"
 readme = "README.md"
 categories = ["video", "audio", "downloader", "mp4", "mp3", "encoder"]
