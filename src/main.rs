@@ -135,12 +135,10 @@ async fn main() -> Result<()> {
     match cleanup_cache_files() {
         Ok(_) => {
             println!("Successfully removed cache directory");
-        },
+        }
         Err(_) => {
             eprintln!("Err");
-            return Err(anyhow!(
-                "Failed to remove cache directory"
-            ));
+            return Err(anyhow!("Failed to remove cache directory"));
         }
     };
 
@@ -329,8 +327,10 @@ fn cleanup_cache_files() -> Result<()> {
 
     let cache_dir = &PathBuf::from("cache");
     if cache_dir.exists() {
-        std::fs::remove_dir_all(cache_dir)
-            .context(format!("Failed to remove cache directory: {}", cache_dir.display()))?;
+        std::fs::remove_dir_all(cache_dir).context(format!(
+            "Failed to remove cache directory: {}",
+            cache_dir.display()
+        ))?;
         println!("Removed: {}", cache_dir.display());
     }
 
