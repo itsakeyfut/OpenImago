@@ -8,7 +8,7 @@ use tokio::time::Duration;
 use yt_dlp::Youtube;
 use yt_dlp::fetcher::deps::Libraries;
 
-use yt_downloader::cli::args::Args;
+use open_imago::cli::args::Args;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -111,14 +111,32 @@ async fn main() -> Result<()> {
 
     // TODO: find video title from URL and name it
     let output_filename = match args.format.as_str() {
-        "mp3" => format!("audio_{}.mp3", get_safe_timestamp()),
-        "mp4" => {
-            let quality_str = match args.quality.as_str() {
-                "best" => "best",
-                "worst" => "worst",
-                res => res,
+        "mp3" => {
+            let title = match get_video_title(&yt_path, &args.url).await {
+                Ok(title) => title,
+                Err(e) => {
+                    eprintln!("Warning: Could not get video title: {}", e);
+                    format!("audio_{}", get_safe_timestamp())
+                }
             };
-            format!("video_{}_{}.mp4", quality_str, get_safe_timestamp())
+
+            format!("{}.mp3", title)
+        },
+        "mp4" => {
+            let title = match get_video_title(&yt_path, &args.url).await {
+                Ok(title) => title,
+                Err(e) => {
+                    eprintln!("Warning: Could not get video title: {}", e);
+                    let quality_str = match args.quality.as_str() {
+                        "best" => "best",
+                        "worst" => "worst",
+                        res => res,
+                    };
+                    format!("video_{}_{}", quality_str, get_safe_timestamp())
+                }
+            };
+
+            format!("{}.mp4", title)
         }
         other => return Err(anyhow!("Unsupported format: {}", other)),
     };
@@ -149,17 +167,14 @@ async fn main() -> Result<()> {
         "mp3" => {
             let output_path = output_dir.join(&output_filename);
 
-            let yt_dlp_cmd = format!(
-                "{} {} -x --audio-format mp3 --audio-quality 0 -o {}",
-                yt_path.display(),
-                args.url,
-                output_path.display()
-            );
-
-            println!("Executing custom yt-dlp command for MP3: {}", yt_dlp_cmd);
-
-            let status = Command::new("cmd")
-                .args(&["/C", &yt_dlp_cmd])
+            let status = Command::new(&yt_path)
+                .args(&[
+                    &args.url,
+                    "-x", 
+                    "--audio-format", "mp3", 
+                    "--audio-quality", "0",
+                    "-o", &output_path.to_string_lossy()
+                ])
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .status()
@@ -177,17 +192,24 @@ async fn main() -> Result<()> {
         "mp4" => {
             let output_path = output_dir.join(&output_filename);
 
+            let output_path_str = output_path.to_string_lossy().replace("\\", "/");
+            let yt_path_str = yt_path.to_string_lossy().replace("\\", "/");
+
             let yt_dlp_cmd = format!(
-                "{} {} -f \"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best\" --merge-output-format mp4 -o {}",
-                yt_path.display(),
+                "{} {} -f best -o \"{}\"",
+                yt_path_str,
                 args.url,
-                output_path.display()
+                output_path_str
             );
 
             println!("Executing custom yt-dlp command for MP4: {}", yt_dlp_cmd);
 
-            let status = Command::new("cmd")
-                .args(&["/C", &yt_dlp_cmd])
+            let status = Command::new(&yt_path)
+                .args(&[
+                    &args.url,
+                    "-f", "best", 
+                    "-o", &output_path.to_string_lossy()
+                ])
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .status()
@@ -227,23 +249,14 @@ async fn main() -> Result<()> {
 
 /// Extract zip file
 fn extract_ffmpeg_zip(zip_path: &PathBuf, output_dir: &PathBuf) -> Result<()> {
-    // Use Powershell command
-    let expand_command = format!(
-        "Expand-Archive -Path '{}' -DestinationPath '{}' -Force",
-        zip_path.display(),
-        output_dir.display()
-    );
-
-    println!("Executing: {}", expand_command);
-
-    let status = Command::new("powershell")
-        .args(&["-Command", &expand_command])
+    let status = Command::new("unzip")
+        .args(&["-o", &zip_path.to_string_lossy(), "-d", &output_dir.to_string_lossy()])
         .status()
-        .context("Failed to execute PowerShell to extract ffmpeg zip")?;
+        .context("Failed to execute unzip command")?;
 
     if !status.success() {
         return Err(anyhow!(
-            "Failed to extract ffmpeg zip. PowerShell exit code: {:?}",
+            "Failed to extract ffmpeg zip. bash exit code: {:?}",
             status.code()
         ));
     }
@@ -363,6 +376,62 @@ fn create_download_progress_bar(message: &str) -> ProgressBar {
     );
     pb.set_message(message.to_string());
     pb
+}
+
+async fn get_video_title(yt_path: &PathBuf, url: &str) -> Result<String> {
+    let output = Command::new(&yt_path)
+        .args(&[url, "--print", "title"])
+        .output()
+        .context("Failed to execute yt-dlp command to get title")?;
+
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!(
+            "Failed to get video title, exit code: {:?}, error: {}",
+            output.status.code(),
+            error
+        ));
+    }
+
+    let title = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .to_string();
+
+    if title.is_empty() {
+        return Err(anyhow!("Empty title returned from yt-dlp"));
+    }
+
+    let safe_title = sanitize_filename(&title);
+    println!("Retrieved title: {}", safe_title);
+
+    Ok(safe_title)
+}
+
+fn sanitize_filename(filename: &str) -> String {
+    // First remove problematic characters
+    let sanitized = filename
+        .replace("/", "_")
+        .replace("\\", "_")
+        .replace(":", "_")
+        .replace("*", "_")
+        .replace("?", "_")
+        .replace("\"", "_")
+        .replace("<", "_")
+        .replace(">", "_")
+        .replace("|", "_");
+    
+    // Keep only ASCII characters or replace with underscores
+    let ascii_only: String = sanitized
+        .chars()
+        .map(|c| if c.is_ascii() { c } else { '_' })
+        .take(50)
+        .collect();
+    
+    if ascii_only.trim().is_empty() {
+        return "video".to_string();
+    }
+    
+    ascii_only
 }
 
 /// Get timestampe
